@@ -1,4 +1,6 @@
-import { brands, storageTypes, batteryTypes, years } from "../../data/products";
+import { useMemo } from "react";
+import { getBrands, getYears, getStorageTypes, getBatteryTypes } from "../../data/productHelpers";
+import { useProductStore } from "../../store/productStore";
 
 function toggleInSet(set, value) {
   const next = new Set(set);
@@ -7,12 +9,14 @@ function toggleInSet(set, value) {
   return next;
 }
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 export const DEFAULT_FILTERS = {
   brands: new Set(),
   storage: new Set(),
   battery: new Set(),
-  yearMin: years[0],
-  yearMax: years[years.length - 1],
+  yearMin: 1990,
+  yearMax: CURRENT_YEAR,
   priceMax: 250,
   mpMin: 0,
   zoomMin: 0,
@@ -21,6 +25,14 @@ export const DEFAULT_FILTERS = {
 };
 
 export default function FilterPanel({ filters, setFilters }) {
+  const products = useProductStore((s) => s.products);
+  const brands = useMemo(() => getBrands(products), [products]);
+  const storageTypes = useMemo(() => getStorageTypes(products), [products]);
+  const batteryTypes = useMemo(() => getBatteryTypes(products), [products]);
+  const years = useMemo(() => getYears(products), [products]);
+  const yearFloor = years[0] ?? DEFAULT_FILTERS.yearMin;
+  const yearCeil = years[years.length - 1] ?? DEFAULT_FILTERS.yearMax;
+
   function patch(p) {
     setFilters((f) => ({ ...f, ...p }));
   }
@@ -47,21 +59,21 @@ export default function FilterPanel({ filters, setFilters }) {
         <div className="filter-group__title">Year</div>
         <div className="field">
           <label htmlFor="yearMin">
-            {filters.yearMin} – {filters.yearMax}
+            {Math.max(filters.yearMin, yearFloor)} – {Math.min(filters.yearMax, yearCeil)}
           </label>
           <input
             id="yearMin"
             type="range"
-            min={years[0]}
-            max={years[years.length - 1]}
-            value={filters.yearMin}
+            min={yearFloor}
+            max={yearCeil}
+            value={Math.max(filters.yearMin, yearFloor)}
             onChange={(e) => patch({ yearMin: Math.min(Number(e.target.value), filters.yearMax) })}
           />
           <input
             type="range"
-            min={years[0]}
-            max={years[years.length - 1]}
-            value={filters.yearMax}
+            min={yearFloor}
+            max={yearCeil}
+            value={Math.min(filters.yearMax, yearCeil)}
             onChange={(e) => patch({ yearMax: Math.max(Number(e.target.value), filters.yearMin) })}
           />
         </div>

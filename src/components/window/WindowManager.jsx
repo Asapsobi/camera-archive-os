@@ -7,6 +7,7 @@ import ProductDetailApp from "../product/ProductDetailApp";
 import WishlistApp from "../product/WishlistApp";
 import CartApp from "../cart/CartApp";
 import CheckoutApp from "../checkout/CheckoutApp";
+import OrderResultApp from "../checkout/OrderResultApp";
 import ReadmeApp from "../readme/ReadmeApp";
 import RecycleBinApp from "../recyclebin/RecycleBinApp";
 import TimelineApp from "../timeline/TimelineApp";
@@ -25,6 +26,7 @@ const REGISTRY = {
   wishlist: WishlistApp,
   cart: CartApp,
   checkout: CheckoutApp,
+  orderResult: OrderResultApp,
   readme: ReadmeApp,
   recyclebin: RecycleBinApp,
   timeline: TimelineApp,

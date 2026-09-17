@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { getVisibleProducts } from "../../data/products";
+import { getVisibleProducts } from "../../data/productHelpers";
+import { useProductStore } from "../../store/productStore";
 import ProductCard from "../product/ProductCard";
 import FilterPanel, { DEFAULT_FILTERS } from "./FilterPanel";
 import { useLauncher } from "../../hooks/useLauncher";
@@ -19,16 +20,23 @@ export default function CameraArchiveApp({ initialBrand }) {
   const [filters, setFilters] = useState(() =>
     initialBrand ? { ...DEFAULT_FILTERS, brands: new Set([initialBrand]) } : DEFAULT_FILTERS
   );
-  const [loading, setLoading] = useState(true);
+  const [minDelayDone, setMinDelayDone] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const products = useProductStore((s) => s.products);
+  const fetchStatus = useProductStore((s) => s.status);
+  const fetchError = useProductStore((s) => s.error);
+  const ensureLoaded = useProductStore((s) => s.ensureLoaded);
 
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 480);
+    ensureLoaded();
+    const t = setTimeout(() => setMinDelayDone(true), 480);
     return () => clearTimeout(t);
-  }, []);
+  }, [ensureLoaded]);
+
+  const loading = !minDelayDone || fetchStatus === "loading" || fetchStatus === "idle";
 
   const results = useMemo(() => {
-    const all = getVisibleProducts();
+    const all = getVisibleProducts(products);
     const q = query.trim().toLowerCase();
     const filtered = all.filter((p) => {
       if (filters.brands.size && !filters.brands.has(p.brand)) return false;
@@ -50,7 +58,7 @@ export default function CameraArchiveApp({ initialBrand }) {
       return true;
     });
     return filtered.sort(SORTS[sort].cmp);
-  }, [query, sort, filters]);
+  }, [products, query, sort, filters]);
 
   return (
     <div className="catalog">
@@ -84,7 +92,17 @@ export default function CameraArchiveApp({ initialBrand }) {
           </button>
         </div>
 
-        {loading ? (
+        {fetchStatus === "error" ? (
+          <div className="catalog__empty">
+            CONNECTION LOST.
+            <br />
+            {fetchError || "Could not reach the archive database."}
+            <br />
+            <button type="button" className="btn btn--sm" style={{ marginTop: 10 }} onClick={ensureLoaded}>
+              Retry
+            </button>
+          </div>
+        ) : loading ? (
           <div className="app__scroll" style={{ padding: 16 }}>
             <div className="mono" style={{ marginBottom: 10, fontSize: 12, color: "var(--metal-700)" }}>
               CONNECTING TO ARCHIVE DATABASE<span className="blink-cursor" />

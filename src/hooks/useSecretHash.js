@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { products } from "../data/products";
+import { useProductStore } from "../store/productStore";
 import { useLauncher } from "./useLauncher";
 
 const KNOWN = new Set(["", "0017", "classified", "old-index"]);
@@ -13,12 +13,12 @@ export function useSecretHash() {
       if (!hash) return;
 
       if (hash === "0017") {
-        const p = products.find((x) => x.serial?.toLowerCase().endsWith("0017"));
+        const p = useProductStore.getState().products.find((x) => x.serial?.toLowerCase().endsWith("0017"));
         if (p) launch("product", { productId: p.id });
         return;
       }
       if (hash === "classified") {
-        const p = products.find((x) => x.status === "CLASSIFIED");
+        const p = useProductStore.getState().products.find((x) => x.status === "CLASSIFIED");
         if (p) launch("product", { productId: p.id });
         return;
       }

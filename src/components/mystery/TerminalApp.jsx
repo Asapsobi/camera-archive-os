@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useSystemStore } from "../../store/systemStore";
 import { useWindowStore } from "../../store/windowStore";
-import { products } from "../../data/products";
+import { useProductStore } from "../../store/productStore";
 import { getClue } from "../../data/clues";
 
 const HELP = `available commands:
@@ -40,6 +40,8 @@ export default function TerminalApp({ winKey }) {
     print(`C:\\ARCHIVE> ${cmd}`);
     const [verb, ...rest] = cmd.toLowerCase().split(/\s+/);
     const arg = rest.join(" ");
+
+    const products = useProductStore.getState().products;
 
     switch (verb) {
       case "":

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import ProductPhoto from "./ProductPhoto";
 import Icon from "../desktop/Icon";
-import { getProductById, STATUS } from "../../data/products";
+import { getProductById, STATUS } from "../../data/productHelpers";
+import { useProductStore } from "../../store/productStore";
 import { getClue } from "../../data/clues";
 import { useCartStore } from "../../store/cartStore";
 import { useWishlistStore } from "../../store/wishlistStore";
@@ -18,7 +19,9 @@ const STATUS_BADGE = {
 };
 
 export default function ProductDetailApp({ productId }) {
-  const product = getProductById(productId);
+  const products = useProductStore((s) => s.products);
+  const fetchStatus = useProductStore((s) => s.status);
+  const product = getProductById(products, productId);
   const add = useCartStore((s) => s.add);
   const hasWish = useWishlistStore((s) => s.has(productId));
   const toggleWish = useWishlistStore((s) => s.toggle);
@@ -33,7 +36,7 @@ export default function ProductDetailApp({ productId }) {
   if (!product) {
     return (
       <div className="app__scroll" style={{ padding: 20 }}>
-        RECORD NOT FOUND.
+        {fetchStatus === "ready" ? "RECORD NOT FOUND." : "READING RECORD..."}
       </div>
     );
   }

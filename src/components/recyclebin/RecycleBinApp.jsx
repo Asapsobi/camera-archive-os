@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { getDeletedProducts, STATUS } from "../../data/products";
+import { getDeletedProducts, STATUS } from "../../data/productHelpers";
+import { useProductStore } from "../../store/productStore";
 import { getClue, clues } from "../../data/clues";
 import { useSystemStore } from "../../store/systemStore";
 import { useSound } from "../../hooks/useSound";
 
 export default function RecycleBinApp() {
-  const items = getDeletedProducts();
+  const products = useProductStore((s) => s.products);
+  const items = getDeletedProducts(products);
   const restoredFiles = useSystemStore((s) => s.restoredFiles);
   const restoreFile = useSystemStore((s) => s.restoreFile);
   const discoverClue = useSystemStore((s) => s.discoverClue);

@@ -9,16 +9,41 @@ import WindowManager from "./components/window/WindowManager";
 import WinampWidget from "./components/music/WinampWidget";
 import { useSystemStore } from "./store/systemStore";
 import { useNotifyStore } from "./store/notifyStore";
+import { useProductStore } from "./store/productStore";
+import { useCartStore } from "./store/cartStore";
 import { useLauncher } from "./hooks/useLauncher";
 import { useSecretHash } from "./hooks/useSecretHash";
 
+function readPaymentReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const orderCode = params.get("order");
+  const payment = params.get("payment");
+  if (!orderCode || !payment) return null;
+  return { orderCode, success: payment === "success" };
+}
+
 export default function App() {
   const booted = useSystemStore((s) => s.booted);
-  const [showBoot, setShowBoot] = useState(!booted);
+  const paymentReturn = useState(readPaymentReturn)[0];
+  const [showBoot, setShowBoot] = useState(!booted && !paymentReturn);
   const push = useNotifyStore((s) => s.push);
   const launch = useLauncher();
+  const ensureProductsLoaded = useProductStore((s) => s.ensureLoaded);
+  const clearCart = useCartStore((s) => s.clear);
 
   useSecretHash();
+
+  useEffect(() => {
+    ensureProductsLoaded();
+  }, [ensureProductsLoaded]);
+
+  useEffect(() => {
+    if (!paymentReturn) return;
+    if (paymentReturn.success) clearCart();
+    launch("orderResult", paymentReturn);
+    window.history.replaceState(null, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (showBoot) return;

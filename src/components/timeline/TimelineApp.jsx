@@ -1,18 +1,26 @@
-import { useEffect, useState } from "react";
-import { years, getProductsByYear } from "../../data/products";
+import { useEffect, useMemo, useState } from "react";
+import { getYears, getProductsByYear } from "../../data/productHelpers";
+import { useProductStore } from "../../store/productStore";
 import ProductCard from "../product/ProductCard";
 import { useLauncher } from "../../hooks/useLauncher";
 
 export default function TimelineApp() {
-  const [year, setYear] = useState(years[years.length - 1]);
+  const products = useProductStore((s) => s.products);
+  const years = useMemo(() => getYears(products), [products]);
+  const [year, setYear] = useState(null);
   const [scanLines, setScanLines] = useState([]);
   const [scanning, setScanning] = useState(false);
   const launch = useLauncher();
 
   useEffect(() => {
+    if (year == null && years.length) setYear(years[years.length - 1]);
+  }, [year, years]);
+
+  useEffect(() => {
+    if (year == null) return;
     setScanning(true);
     setScanLines([]);
-    const items = getProductsByYear(year);
+    const items = getProductsByYear(products, year);
     const steps = [
       `SEEKING SECTOR ${year}...`,
       `INDEX FOUND: ${items.length} DEVICE${items.length === 1 ? "" : "S"}`,
@@ -29,9 +37,9 @@ export default function TimelineApp() {
       }
     }, 140);
     return () => clearInterval(id);
-  }, [year]);
+  }, [year, products]);
 
-  const items = getProductsByYear(year);
+  const items = year == null ? [] : getProductsByYear(products, year);
 
   return (
     <div className="timeline">
@@ -43,7 +51,9 @@ export default function TimelineApp() {
         ))}
       </div>
       <div className="timeline__content">
-        {scanning ? (
+        {year == null ? (
+          <div className="catalog__empty">LOADING ARCHIVE INDEX...</div>
+        ) : scanning ? (
           <div>
             {scanLines.map((l, i) => (
               <div key={i} className="scan-line">

@@ -1,7 +1,8 @@
-import CameraIllustration from "../product/CameraIllustration";
+import ProductPhoto from "../product/ProductPhoto";
 import Icon from "../desktop/Icon";
 import { useCartStore } from "../../store/cartStore";
-import { getProductById } from "../../data/products";
+import { getProductById } from "../../data/productHelpers";
+import { useProductStore } from "../../store/productStore";
 import { useLauncher } from "../../hooks/useLauncher";
 import { useSound } from "../../hooks/useSound";
 
@@ -9,10 +10,11 @@ export default function CartApp() {
   const items = useCartStore((s) => s.items);
   const setQty = useCartStore((s) => s.setQty);
   const remove = useCartStore((s) => s.remove);
+  const products = useProductStore((s) => s.products);
   const launch = useLauncher();
   const play = useSound();
 
-  const lines = items.map((i) => ({ ...i, product: getProductById(i.productId) })).filter((l) => l.product);
+  const lines = items.map((i) => ({ ...i, product: getProductById(products, i.productId) })).filter((l) => l.product);
   const subtotal = lines.reduce((sum, l) => sum + (l.product.price ?? 0) * l.qty, 0);
 
   if (lines.length === 0) {
@@ -38,7 +40,7 @@ export default function CartApp() {
         {lines.map((l) => (
           <div key={l.productId} className="cart-line">
             <div className="cart-line__thumb">
-              <CameraIllustration bodyStyle={l.product.bodyStyle} colorway={l.product.colorway} />
+              <ProductPhoto product={l.product} />
             </div>
             <div className="cart-line__info">
               <div style={{ fontSize: 12.5, fontWeight: 700 }}>

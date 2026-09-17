@@ -1,11 +1,18 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Icon from "../desktop/Icon";
-import { brands, getProductsByBrand } from "../../data/products";
+import { getBrands, getProductsByBrand } from "../../data/productHelpers";
+import { useProductStore } from "../../store/productStore";
 import { useLauncher } from "../../hooks/useLauncher";
 
 export default function MyComputerApp() {
-  const [selected, setSelected] = useState(brands[0]);
+  const products = useProductStore((s) => s.products);
+  const brands = useMemo(() => getBrands(products), [products]);
+  const [selected, setSelected] = useState(null);
   const launch = useLauncher();
+
+  useEffect(() => {
+    if (selected == null && brands.length) setSelected(brands[0]);
+  }, [selected, brands]);
 
   return (
     <div className="explorer">
@@ -25,7 +32,7 @@ export default function MyComputerApp() {
         ) : (
           <>
             <h3 style={{ marginTop: 0 }}>{selected}\</h3>
-            <p className="mono" style={{ fontSize: 12 }}>{getProductsByBrand(selected).length} file(s) indexed</p>
+            <p className="mono" style={{ fontSize: 12 }}>{getProductsByBrand(products, selected).length} file(s) indexed</p>
             <div
               role="button"
               tabIndex={0}

@@ -1,12 +1,14 @@
 import { useWishlistStore } from "../../store/wishlistStore";
-import { getProductById } from "../../data/products";
+import { getProductById } from "../../data/productHelpers";
+import { useProductStore } from "../../store/productStore";
 import ProductCard from "./ProductCard";
 import { useLauncher } from "../../hooks/useLauncher";
 
 export default function WishlistApp() {
   const ids = useWishlistStore((s) => s.ids);
+  const allProducts = useProductStore((s) => s.products);
   const launch = useLauncher();
-  const products = ids.map(getProductById).filter(Boolean);
+  const products = ids.map((id) => getProductById(allProducts, id)).filter(Boolean);
 
   if (products.length === 0) {
     return (

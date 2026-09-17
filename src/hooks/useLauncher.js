@@ -15,6 +15,7 @@ export const APP_CONFIG = {
   internet: { type: "internet", title: "The Internet — Camera Archive Online", icon: "globe", width: 820, height: 580 },
   cart: { type: "cart", title: "Shopping Cart", icon: "cart", width: 480, height: 460 },
   checkout: { type: "checkout", title: "Checkout", icon: "lock", width: 520, height: 560 },
+  orderResult: { type: "orderResult", title: "Order Status", icon: "lock", width: 460, height: 320 },
   timeline: { type: "timeline", title: "Archive Timeline", icon: "floppy", width: 700, height: 520 },
   terminal: { type: "terminal", title: "MS-DOS Prompt", icon: "terminal", width: 560, height: 380 },
   error404: { type: "error404", title: "ERROR — 404", icon: "warning", width: 460, height: 320 },
