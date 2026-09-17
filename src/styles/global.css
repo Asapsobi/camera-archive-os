@@ -1,0 +1,119 @@
+@import "./tokens.css";
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--bg-desktop);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  cursor: url("/cursors/arrow.svg") 2 2, default;
+}
+
+@media (pointer: coarse) {
+  body {
+    cursor: auto;
+  }
+}
+
+a {
+  color: var(--xp-blue-800);
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  cursor: url("/cursors/hand.svg") 6 2, pointer;
+}
+
+@media (pointer: coarse) {
+  button {
+    cursor: auto;
+  }
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  cursor: url("/cursors/text.svg") 8 8, text;
+}
+
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    cursor: auto;
+  }
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+::selection {
+  background: var(--xp-blue-300);
+  color: var(--ink);
+}
+
+/* thin retro scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--xp-blue-600) var(--silver-300);
+}
+*::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--silver-300);
+  border-left: 1px solid var(--silver-500);
+}
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--xp-blue-500), var(--xp-blue-700));
+  border: 1px solid var(--xp-blue-900);
+  border-radius: 2px;
+}
+*::-webkit-scrollbar-button {
+  display: none;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.pixel {
+  font-family: var(--font-pixel);
+  letter-spacing: 0.5px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

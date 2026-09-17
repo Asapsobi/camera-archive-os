@@ -1,0 +1,79 @@
+:root {
+  /* -- Brand accent: deep indigo, used deliberately on a white/neutral base -- */
+  --indigo-950: #0a0060;
+  --indigo-900: #0d0072;
+  --indigo-800: #0f0087; /* brand base */
+  --indigo-700: #2b1f9e;
+  --indigo-600: #4535b8;
+  --indigo-500: #6657d1;
+  --indigo-300: #b3a8ea;
+  --indigo-100: #ece8fb;
+
+  --xp-blue-950: var(--indigo-950);
+  --xp-blue-900: var(--indigo-900);
+  --xp-blue-800: var(--indigo-800);
+  --xp-blue-700: #0f0087;
+  --xp-blue-600: var(--indigo-600);
+  --xp-blue-500: var(--indigo-500);
+  --xp-blue-300: var(--indigo-300);
+  --xp-blue-100: var(--indigo-100);
+  --xp-glow: #6a5cf5;
+
+  /* neutral surfaces — kept genuinely neutral so the accent stays an accent */
+  --silver-100: #ffffff;
+  --silver-200: #f7f7fa;
+  --silver-300: #ebeaf1;
+  --silver-400: #d8d6e6;
+  --silver-500: #ada8c7;
+  --metal-600: #6f6a8c;
+  --metal-700: #454158;
+
+  --crt-white: #ffffff;
+  --off-white: #f7f7fa;
+
+  --lime: #9fd63c;
+  --lime-dim: #6f9c2b;
+  --warn-yellow: #ffcc33;
+  --warn-yellow-dim: #cc9f1f;
+  --danger-red: #c23b3b;
+
+  --ink: #1c1a2b;
+  --ink-soft: #4b4768;
+
+  /* desktop wallpaper — mostly white/neutral, indigo only as a soft lift */
+  --grad-pink: #ffffff;
+  --grad-lilac: #f4f2fc;
+  --grad-violet: #e7e2f7;
+
+  --gold: #0f0087;
+  --gold-dim: #0d0072;
+  --gold-ink: #ffffff;
+
+  /* semantic */
+  --bg-desktop: #f4f2fc;
+  --bg-window: #ffffff;
+  --bg-window-recessed: #ffffff;
+  --border-window: #c3c0dc;
+  --titlebar-from: #ffffff;
+  --titlebar-to: #ffffff;
+  --titlebar-text: #0f0087;
+
+  --font-ui: "Fredoka", "Trebuchet MS", Verdana, Tahoma, "Segoe UI", Arial, sans-serif;
+  --font-mono: "Courier New", Courier, monospace;
+  --font-pixel: "VT323", "Courier New", monospace;
+
+  --radius-window: 12px;
+  --radius-control: 8px;
+
+  --shadow-window: 0 10px 26px rgba(15, 0, 135, 0.14), 0 0 0 1px rgba(15, 0, 135, 0.08);
+  --shadow-control: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+
+  --z-desktop: 0;
+  --z-window-base: 100;
+  --z-taskbar: 900;
+  --z-startmenu: 950;
+  --z-notification: 980;
+  --z-boot: 999;
+  --z-crt: 1000;
+  --z-cursor: 1100;
+}

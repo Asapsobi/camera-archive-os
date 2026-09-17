@@ -1,0 +1,52 @@
+# HOW TO ADD A PRODUCT
+# ---------------------
+# 1. Copy this whole "_TEMPLATE" folder.
+# 2. Rename the COPY to the product's name, e.g. "Canon PowerShot A520".
+#    (folders starting with "_" are ignored by the importer, so don't rename
+#    this one — copy it first, then rename the copy.)
+# 3. Put the camera's photos in that same folder (.jpg, .jpeg, .png, or .webp
+#    — any number of them, the first one alphabetically becomes the main photo).
+# 4. Edit details.txt below (or just delete lines you don't have info for —
+#    everything except Brand and Model is optional).
+# 5. Run:  npm run import-products
+#
+# Lines starting with # are comments and are ignored by the importer.
+# Format is "Key: value", one per line. Keys are not case-sensitive.
+
+Brand: Canon
+Series: PowerShot
+Model: A520
+Year: 2005
+Price: 74
+Megapixels: 4.0
+Optical Zoom: 4
+Digital Zoom: 3.6
+Storage: SD / MMC
+Battery: 2x AA
+Display Inches: 1.8
+Video: 320x240 @30fps
+Weight Grams: 215
+
+# One of: silver, black, graphite, titanium, blue, pink, orange, white
+# (only matters as a fallback color if you don't add photos)
+Colorway: graphite
+
+# One of: compact, ultracompact, bridge, rugged, mirrorless
+Body Style: compact
+
+Condition Body: GOOD
+Condition Lens: EXCELLENT
+Condition LCD: MINOR SCRATCHES
+Condition Overall: 8.0
+
+# AVAILABLE, ON HOLD, SOLD, DELETED, or CLASSIFIED
+Status: AVAILABLE
+Stock: 1
+
+# Anything, or leave blank and one gets made up for you
+Serial: CN05-A520-1141
+
+# Comma-separated
+Accessories: Battery door (spare), Strap
+
+Notes: A short, honest note about condition or character. What makes this one worth buying.
