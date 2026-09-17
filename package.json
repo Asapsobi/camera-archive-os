@@ -7,12 +7,14 @@
     "dev": "vite",
     "import-products": "node scripts/import-products.js",
     "build": "vite build",
+    "start": "serve -s build -l ${PORT:-3000}",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "serve": "^14.2.6",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
