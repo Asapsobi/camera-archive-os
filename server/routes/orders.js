@@ -1,5 +1,5 @@
 import express from "express";
-import { pool } from "../db.js";
+import { TABLES, readAll, appendRow, updateRow, nextId } from "../sheets.js";
 import { requireAdmin } from "../auth.js";
 import { requestPayment, verifyPayment } from "../payment/zarinpal.js";
 
@@ -17,143 +17,133 @@ router.post("/checkout", async (req, res) => {
     return res.status(400).json({ error: "Cart is empty." });
   }
 
-  const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    const products = await readAll(TABLES.PRODUCTS);
 
     let subtotal = 0;
     const lines = [];
     for (const item of items) {
-      const { rows } = await client.query(
-        `SELECT id_num, id, brand, model, price, status, stock, disabled FROM products WHERE id = $1 FOR UPDATE`,
-        [item.productId]
-      );
-      const product = rows[0];
+      const product = products.find((p) => p.id === item.productId);
       const qty = Math.max(1, Number(item.qty) || 1);
       if (!product || product.disabled || product.status !== "AVAILABLE") {
-        await client.query("ROLLBACK");
         return res.status(409).json({ error: `${item.productId} is no longer available.` });
       }
       if (product.price == null) {
-        await client.query("ROLLBACK");
         return res.status(409).json({ error: `${item.productId} is not priced yet.` });
       }
       if (product.stock < qty) {
-        await client.query("ROLLBACK");
         return res.status(409).json({ error: `Only ${product.stock} left of ${product.brand} ${product.model}.` });
       }
       subtotal += Number(product.price) * qty;
       lines.push({ ...product, qty });
     }
 
-    const { rows: orderRows } = await client.query(
-      `INSERT INTO orders (customer_name, email, address, city, postal_code, country, subtotal, currency)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'EUR')
-       RETURNING id_num, code`,
-      [
-        customer?.name || null,
-        customer?.email || null,
-        customer?.address || null,
-        customer?.city || null,
-        customer?.postalCode || null,
-        customer?.country || null,
-        subtotal,
-      ]
-    );
-    const order = orderRows[0];
+    const existingOrders = await readAll(TABLES.ORDERS);
+    const code = nextId(existingOrders, "code", "ORD", 5);
+    const order = {
+      code,
+      status: "pending",
+      customerName: customer?.name || null,
+      email: customer?.email || null,
+      address: customer?.address || null,
+      city: customer?.city || null,
+      postalCode: customer?.postalCode || null,
+      country: customer?.country || null,
+      subtotal,
+      currency: "EUR",
+      paymentGateway: null,
+      paymentAuthority: null,
+      paymentAmountRial: null,
+      paymentRef: null,
+      paidAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    const orderRow = await appendRow(TABLES.ORDERS, order);
 
     for (const line of lines) {
-      await client.query(
-        `INSERT INTO order_items (order_id_num, product_id_num, brand, model, unit_price, qty)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [order.id_num, line.id_num, line.brand, line.model, line.price, line.qty]
-      );
+      await appendRow(TABLES.ORDER_ITEMS, {
+        orderCode: code,
+        productId: line.id,
+        brand: line.brand,
+        model: line.model,
+        unitPrice: line.price,
+        qty: line.qty,
+      });
     }
 
-    let redirectUrl;
     try {
       const payment = await requestPayment({
         amountEur: subtotal,
-        description: `ARCHIVE.SYS order ${order.code}`,
-        callbackUrl: `${publicBaseUrl(req)}/api/payment/callback?order=${order.id_num}`,
+        description: `ARCHIVE.SYS order ${code}`,
+        callbackUrl: `${publicBaseUrl(req)}/api/payment/callback?order=${code}`,
         email: customer?.email,
       });
-      await client.query(
-        `UPDATE orders SET payment_gateway = 'zarinpal', payment_authority = $1, payment_amount_rial = $2 WHERE id_num = $3`,
-        [payment.authority, payment.amountRial, order.id_num]
-      );
-      redirectUrl = payment.payUrl;
+      await updateRow(TABLES.ORDERS, orderRow, {
+        ...order,
+        paymentGateway: "zarinpal",
+        paymentAuthority: payment.authority,
+        paymentAmountRial: payment.amountRial,
+      });
+      res.json({ orderCode: code, redirectUrl: payment.payUrl });
     } catch (err) {
       console.error("[checkout] payment request failed:", err.message);
-      await client.query(`UPDATE orders SET status = 'failed' WHERE id_num = $1`, [order.id_num]);
-      await client.query("COMMIT");
-      return res.status(502).json({ error: "Could not start payment. Please try again shortly." });
+      await updateRow(TABLES.ORDERS, orderRow, { ...order, status: "failed" });
+      res.status(502).json({ error: "Could not start payment. Please try again shortly." });
     }
-
-    await client.query("COMMIT");
-    res.json({ orderCode: order.code, redirectUrl });
   } catch (err) {
-    await client.query("ROLLBACK");
     console.error(err);
     res.status(500).json({ error: "Checkout failed." });
-  } finally {
-    client.release();
   }
 });
 
 // ---- payment gateway return (public, hit by ZarinPal) ----
 
 router.get("/payment/callback", async (req, res) => {
-  const orderIdNum = req.query.order;
+  const orderCode = req.query.order;
   const authority = req.query.Authority;
   const status = req.query.Status;
   const base = publicBaseUrl(req);
 
-  const { rows } = await pool.query(
-    `SELECT id_num, code, status, payment_authority, payment_amount_rial FROM orders WHERE id_num = $1`,
-    [orderIdNum]
-  );
-  const order = rows[0];
-  if (!order || order.payment_authority !== authority) {
-    return res.redirect(`${base}/?order=unknown&payment=failed`);
-  }
-  if (order.status === "paid") {
-    return res.redirect(`${base}/?order=${order.code}&payment=success`);
-  }
-  if (status !== "OK") {
-    await pool.query(`UPDATE orders SET status = 'failed' WHERE id_num = $1`, [order.id_num]);
-    return res.redirect(`${base}/?order=${order.code}&payment=failed`);
-  }
-
   try {
-    const result = await verifyPayment({ authority, amountRial: order.payment_amount_rial });
-    if (!result.ok) {
-      await pool.query(`UPDATE orders SET status = 'failed' WHERE id_num = $1`, [order.id_num]);
+    const orders = await readAll(TABLES.ORDERS);
+    const order = orders.find((o) => o.code === orderCode);
+    if (!order || order.paymentAuthority !== authority) {
+      return res.redirect(`${base}/?order=unknown&payment=failed`);
+    }
+    if (order.status === "paid") {
+      return res.redirect(`${base}/?order=${order.code}&payment=success`);
+    }
+    if (status !== "OK") {
+      await updateRow(TABLES.ORDERS, order._row, { ...order, status: "failed" });
       return res.redirect(`${base}/?order=${order.code}&payment=failed`);
     }
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      await client.query(
-        `UPDATE orders SET status = 'paid', paid_at = now(), payment_ref = $1 WHERE id_num = $2`,
-        [result.refId, order.id_num]
-      );
-      await client.query(
-        `UPDATE products p SET stock = stock - oi.qty
-         FROM order_items oi WHERE oi.order_id_num = $1 AND oi.product_id_num = p.id_num`,
-        [order.id_num]
-      );
-      await client.query("COMMIT");
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
+
+    const result = await verifyPayment({ authority, amountRial: order.paymentAmountRial });
+    if (!result.ok) {
+      await updateRow(TABLES.ORDERS, order._row, { ...order, status: "failed" });
+      return res.redirect(`${base}/?order=${order.code}&payment=failed`);
     }
+
+    await updateRow(TABLES.ORDERS, order._row, {
+      ...order,
+      status: "paid",
+      paidAt: new Date().toISOString(),
+      paymentRef: result.refId,
+    });
+
+    const items = (await readAll(TABLES.ORDER_ITEMS)).filter((it) => it.orderCode === orderCode);
+    const products = await readAll(TABLES.PRODUCTS);
+    for (const item of items) {
+      const product = products.find((p) => p.id === item.productId);
+      if (product) {
+        await updateRow(TABLES.PRODUCTS, product._row, { ...product, stock: Math.max(0, product.stock - item.qty) });
+      }
+    }
+
     res.redirect(`${base}/?order=${order.code}&payment=success`);
   } catch (err) {
     console.error("[payment callback]", err);
-    res.redirect(`${base}/?order=${order.code}&payment=failed`);
+    res.redirect(`${base}/?order=${orderCode || "unknown"}&payment=failed`);
   }
 });
 
@@ -161,34 +151,32 @@ router.get("/payment/callback", async (req, res) => {
 
 router.get("/admin/orders", requireAdmin, async (req, res) => {
   try {
-    const { rows } = await pool.query(`
-      SELECT o.*, COALESCE(json_agg(
-        json_build_object('brand', oi.brand, 'model', oi.model, 'unitPrice', oi.unit_price, 'qty', oi.qty)
-      ) FILTER (WHERE oi.id IS NOT NULL), '[]') AS items
-      FROM orders o
-      LEFT JOIN order_items oi ON oi.order_id_num = o.id_num
-      GROUP BY o.id_num
-      ORDER BY o.id_num DESC
-    `);
-    res.json(
-      rows.map((r) => ({
-        code: r.code,
-        status: r.status,
-        customerName: r.customer_name,
-        email: r.email,
-        address: r.address,
-        city: r.city,
-        postalCode: r.postal_code,
-        country: r.country,
-        subtotal: Number(r.subtotal),
-        currency: r.currency,
-        paymentGateway: r.payment_gateway,
-        paymentRef: r.payment_ref,
-        paidAt: r.paid_at,
-        createdAt: r.created_at,
-        items: r.items,
+    const [orders, items] = await Promise.all([readAll(TABLES.ORDERS), readAll(TABLES.ORDER_ITEMS)]);
+    const byCode = new Map();
+    for (const it of items) {
+      if (!byCode.has(it.orderCode)) byCode.set(it.orderCode, []);
+      byCode.get(it.orderCode).push({ brand: it.brand, model: it.model, unitPrice: it.unitPrice, qty: it.qty });
+    }
+    const result = orders
+      .map((o) => ({
+        code: o.code,
+        status: o.status,
+        customerName: o.customerName,
+        email: o.email,
+        address: o.address,
+        city: o.city,
+        postalCode: o.postalCode,
+        country: o.country,
+        subtotal: o.subtotal,
+        currency: o.currency,
+        paymentGateway: o.paymentGateway,
+        paymentRef: o.paymentRef,
+        paidAt: o.paidAt,
+        createdAt: o.createdAt,
+        items: byCode.get(o.code) || [],
       }))
-    );
+      .sort((a, b) => b.code.localeCompare(a.code));
+    res.json(result);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Could not load orders." });
@@ -199,11 +187,10 @@ router.patch("/admin/orders/:code", requireAdmin, async (req, res) => {
   const { status } = req.body || {};
   if (!status) return res.status(400).json({ error: "status is required." });
   try {
-    const { rows } = await pool.query(`UPDATE orders SET status = $1 WHERE code = $2 RETURNING code`, [
-      status,
-      req.params.code,
-    ]);
-    if (!rows[0]) return res.status(404).json({ error: "Not found." });
+    const orders = await readAll(TABLES.ORDERS);
+    const order = orders.find((o) => o.code === req.params.code);
+    if (!order) return res.status(404).json({ error: "Not found." });
+    await updateRow(TABLES.ORDERS, order._row, { ...order, status });
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
