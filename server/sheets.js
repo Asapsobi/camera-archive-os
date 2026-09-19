@@ -1,13 +1,12 @@
 // Google Sheets (as the database) + Google Drive (as photo storage), behind
 // a small table-shaped API so the routes don't need to know either of those
-// are involved. Auth is a service account — no user OAuth flow needed since
-// the sheet/folder are just shared with the service account's email once.
+// are involved. Auth is your own Google account via OAuth (see
+// server/googleAuth.js) — the backend acts as you, so no sharing step is
+// needed on the sheet/folder.
 
-import fs from "node:fs";
 import { Readable } from "node:stream";
 import { google } from "googleapis";
-
-const SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"];
+import { getAuthClient } from "./googleAuth.js";
 
 export const TABLES = {
   PRODUCTS: {
@@ -48,32 +47,15 @@ function requireEnv(name) {
   return v;
 }
 
-function loadCredentials() {
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE) {
-    return JSON.parse(fs.readFileSync(process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE, "utf8"));
-  }
-  const raw = requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON");
-  return JSON.parse(raw);
-}
-
-let _auth;
-function getAuth() {
-  if (!_auth) {
-    const creds = loadCredentials();
-    _auth = new google.auth.JWT(creds.client_email, null, creds.private_key, SCOPES);
-  }
-  return _auth;
-}
-
 let _sheets;
 function sheetsApi() {
-  if (!_sheets) _sheets = google.sheets({ version: "v4", auth: getAuth() });
+  if (!_sheets) _sheets = google.sheets({ version: "v4", auth: getAuthClient() });
   return _sheets;
 }
 
 let _drive;
 function driveApi() {
-  if (!_drive) _drive = google.drive({ version: "v3", auth: getAuth() });
+  if (!_drive) _drive = google.drive({ version: "v3", auth: getAuthClient() });
   return _drive;
 }
 

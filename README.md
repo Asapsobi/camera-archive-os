@@ -12,22 +12,30 @@ A Windows XP/Vista-styled desktop e-commerce storefront for vintage digital came
 
 ## One-time Google Cloud setup
 
+This authorizes the backend to act as **your own Google account** (OAuth), not a separate service account — so there's no sharing step; you already own everything.
+
 1. In [Google Cloud Console](https://console.cloud.google.com), create a project (or reuse one), then enable the **Google Sheets API** and **Google Drive API** for it.
-2. Under **IAM & Admin → Service Accounts**, create a service account (no project-level roles needed — access is granted by sharing specific resources with it, below).
-3. Open the service account → **Keys** → **Add key** → **Create new key** → JSON. Download it.
-4. Create a Google Sheet for the data, and a Drive folder for photos.
-5. Share **both** the Sheet and the folder with the service account's email (found in the JSON as `client_email`), as **Editor**.
-6. Grab the Sheet ID and folder ID from their URLs:
+2. **APIs & Services → OAuth consent screen**: User type **External**, fill in the required fields, and add your own Google account under **Test users**. Leave it in "Testing" — no Google verification needed for personal use.
+3. **APIs & Services → Credentials → Create Credentials → OAuth client ID** → Application type **Desktop app**. Note the **Client ID** and **Client Secret** shown.
+4. Create a Google Sheet for the data, and a Drive folder for photos. Grab their IDs from the URLs:
    - Sheet: `docs.google.com/spreadsheets/d/`**`<SHEET_ID>`**`/edit`
    - Folder: `drive.google.com/drive/folders/`**`<FOLDER_ID>`**
+5. Set `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` (below) locally, then run:
+   ```bash
+   npm run google-oauth-setup
+   ```
+   It prints a URL — open it, sign in with the Google account you want the app to use, click Allow. The script catches the redirect itself and saves the resulting refresh token straight into your local `.env` as `GOOGLE_OAUTH_REFRESH_TOKEN` (never printed in full, never committed). Copy that value from `.env` into your PaaS panel's env vars for deployment.
+
+This is genuinely one-time — the refresh token doesn't expire from use, so the backend never needs you to log in again unless you revoke its access yourself at [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
 
 ## Environment variables
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `PORT` | no (default 3000) | Port the server listens on |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | **yes** (one of these two) | The entire downloaded service-account JSON key, pasted as one env var value |
-| `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` | | Alternative to the above for local dev: a file path to the downloaded JSON key |
+| `GOOGLE_OAUTH_CLIENT_ID` | **yes** | From the OAuth client created in Cloud Console |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | **yes** | From the same OAuth client — a credential, keep it a secret |
+| `GOOGLE_OAUTH_REFRESH_TOKEN` | **yes** | Produced once by `npm run google-oauth-setup` — a credential, keep it a secret |
 | `GOOGLE_SHEET_ID` | **yes** | The spreadsheet's ID (from its URL) |
 | `GOOGLE_DRIVE_FOLDER_ID` | **yes** | The Drive folder's ID (from its URL) — where product photos get uploaded |
 | `ADMIN_PASSWORD` | **yes** | Password for `/admin` — admin login is disabled without it |

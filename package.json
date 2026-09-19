@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "vite",
     "dev:server": "node --watch server/index.js",
-    "import-products": "node scripts/import-products.js",
     "build": "vite build",
     "start": "node server/index.js",
     "seed-products": "node scripts/seed-products.js",
+    "google-oauth-setup": "node scripts/google-oauth-setup.js",
     "lint": "oxlint",
     "preview": "vite preview"
   },
