@@ -169,11 +169,24 @@ export async function updateRow(table, rowNumber, obj) {
   });
 }
 
+// Self-healing rather than trusting ensureSheets() already ran in this
+// process — fetches and caches the tab's internal gid on demand if it's
+// missing, instead of silently sending an undefined/wrong sheetId.
+async function getSheetId(sheets, id, tableName) {
+  if (sheetIdCache.has(tableName)) return sheetIdCache.get(tableName);
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: id });
+  const found = (meta.data.sheets || []).find((s) => s.properties.title === tableName);
+  if (!found) throw new Error(`Sheet tab "${tableName}" not found.`);
+  sheetIdCache.set(tableName, found.properties.sheetId);
+  return found.properties.sheetId;
+}
+
 export async function deleteRow(table, rowNumber) {
   const sheets = sheetsApi();
-  const sheetId = sheetIdCache.get(table.name);
+  const id = spreadsheetId();
+  const sheetId = await getSheetId(sheets, id, table.name);
   await sheets.spreadsheets.batchUpdate({
-    spreadsheetId: spreadsheetId(),
+    spreadsheetId: id,
     requestBody: {
       requests: [
         {
@@ -198,6 +211,13 @@ export function nextId(rows, field, prefix, padLength) {
   return `${prefix}-${String(max + 1).padStart(padLength, "0")}`;
 }
 
+// Drive's public "anyone with the link" URLs turn out to be unreliable for
+// real <img> requests (they behave differently for a browser than for a
+// bare curl, likely something in how Drive treats the Referer/UA on that
+// legacy endpoint) — so files stay private, and server/routes/products.js
+// proxies image bytes through our own authenticated Drive access instead
+// via streamDriveFile() below. More reliable, and arguably more sensible
+// than making every photo public on Drive anyway.
 export async function uploadImage(buffer, mimeType, filename) {
   const drive = driveApi();
   const folderId = requireEnv("GOOGLE_DRIVE_FOLDER_ID");
@@ -206,12 +226,7 @@ export async function uploadImage(buffer, mimeType, filename) {
     media: { mimeType, body: Readable.from(buffer) },
     fields: "id",
   });
-  const fileId = res.data.id;
-  await drive.permissions.create({
-    fileId,
-    requestBody: { role: "reader", type: "anyone" },
-  });
-  return `https://drive.google.com/uc?export=view&id=${fileId}`;
+  return `https://drive.google.com/uc?export=view&id=${res.data.id}`;
 }
 
 export function extractDriveFileId(url) {
@@ -224,6 +239,15 @@ export async function deleteImageByUrl(url) {
   if (!fileId) return;
   const drive = driveApi();
   await drive.files.delete({ fileId }).catch(() => {});
+}
+
+export async function streamDriveFile(fileId, res) {
+  const drive = driveApi();
+  const meta = await drive.files.get({ fileId, fields: "mimeType" });
+  const stream = await drive.files.get({ fileId, alt: "media" }, { responseType: "stream" });
+  res.setHeader("Content-Type", meta.data.mimeType || "image/jpeg");
+  res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  stream.data.pipe(res);
 }
 
 // Cheap reachability check for /api/health — reads the Products header row.

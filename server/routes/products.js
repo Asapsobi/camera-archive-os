@@ -9,6 +9,8 @@ import {
   nextId,
   uploadImage,
   deleteImageByUrl,
+  extractDriveFileId,
+  streamDriveFile,
 } from "../sheets.js";
 import { requireAdmin } from "../auth.js";
 
@@ -20,7 +22,7 @@ function splitList(s) {
 }
 
 function serialize(row) {
-  const images = splitList(row.images);
+  const images = splitList(row.images).map((_, i) => `/api/products/${row.id}/image/${i}`);
   return {
     id: row.id,
     brand: row.brand,
@@ -108,6 +110,20 @@ router.get("/products/:id", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Could not load product." });
+  }
+});
+
+router.get("/products/:id/image/:pos", async (req, res) => {
+  try {
+    const rows = await readAll(TABLES.PRODUCTS);
+    const row = rows.find((r) => r.id === req.params.id);
+    const urls = row ? splitList(row.images) : [];
+    const fileId = extractDriveFileId(urls[Number(req.params.pos)]);
+    if (!fileId) return res.status(404).end();
+    await streamDriveFile(fileId, res);
+  } catch (err) {
+    console.error(err);
+    res.status(500).end();
   }
 });
 
