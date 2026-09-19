@@ -39,6 +39,13 @@ export const TABLES = {
     numeric: ["unitPrice", "qty"],
     boolean: [],
   },
+  META: {
+    key: "meta",
+    name: "Meta",
+    columns: ["key", "value"],
+    numeric: ["value"],
+    boolean: [],
+  },
 };
 
 function requireEnv(name) {
@@ -199,16 +206,34 @@ export async function deleteRow(table, rowNumber) {
   });
 }
 
-// Next `${prefix}NNNN`-style id, based on the highest existing numeric
-// suffix in `field` across `rows` — mirrors what a DB auto-increment would
-// have given us.
-export function nextId(rows, field, prefix, padLength) {
-  let max = 0;
-  for (const r of rows) {
-    const m = new RegExp(`^${prefix}-?(\\d+)$`).exec(r[field] || "");
-    if (m) max = Math.max(max, Number(m[1]));
+// Next `${prefix}NNNN`-style id, from a counter that lives in the Meta tab
+// rather than being derived from currently-present rows — so a deleted
+// product's id (and its cached image URLs, see serialize() in
+// routes/products.js) never gets handed to a new one. Mirrors a real DB
+// sequence: it only ever goes up, regardless of what's since been deleted.
+//
+// The first time a given counterKey is used, there's no Meta row for it
+// yet — seed it from the highest id already present in existingRows (e.g.
+// products seeded before this counter existed) instead of starting at 0,
+// which would immediately collide with real data.
+export async function nextCounter(counterKey, prefix, padLength, existingRows = [], field = "id") {
+  const metaRows = await readAll(TABLES.META);
+  const row = metaRows.find((r) => r.key === counterKey);
+  let current = row?.value;
+  if (current == null) {
+    current = 0;
+    for (const r of existingRows) {
+      const m = new RegExp(`^${prefix}-(\\d+)$`).exec(r[field] || "");
+      if (m) current = Math.max(current, Number(m[1]));
+    }
   }
-  return `${prefix}-${String(max + 1).padStart(padLength, "0")}`;
+  const next = current + 1;
+  if (row) {
+    await updateRow(TABLES.META, row._row, { key: counterKey, value: next });
+  } else {
+    await appendRow(TABLES.META, { key: counterKey, value: next });
+  }
+  return `${prefix}-${String(next).padStart(padLength, "0")}`;
 }
 
 // Drive's public "anyone with the link" URLs turn out to be unreliable for
@@ -238,7 +263,14 @@ export async function deleteImageByUrl(url) {
   const fileId = extractDriveFileId(url);
   if (!fileId) return;
   const drive = driveApi();
-  await drive.files.delete({ fileId }).catch(() => {});
+  try {
+    await drive.files.delete({ fileId });
+  } catch (err) {
+    // A failed cleanup shouldn't block deleting the product itself, but it
+    // should be visible instead of vanishing — an orphaned Drive file is a
+    // much smaller problem than a silently-growing one.
+    console.error(`[sheets] could not delete Drive file ${fileId}:`, err.message);
+  }
 }
 
 export async function streamDriveFile(fileId, res) {

@@ -6,7 +6,7 @@ import {
   appendRow,
   updateRow,
   deleteRow,
-  nextId,
+  nextCounter,
   uploadImage,
   deleteImageByUrl,
   extractDriveFileId,
@@ -22,7 +22,12 @@ function splitList(s) {
 }
 
 function serialize(row) {
-  const images = splitList(row.images).map((_, i) => `/api/products/${row.id}/image/${i}`);
+  // `?v=<driveFileId>` makes the URL change whenever the actual photo does
+  // (a new upload, a replaced photo, or — since ids never get reused, see
+  // nextCounter() — a deleted product's slot never being reused either) so
+  // the aggressive long-lived cache on the image route (streamDriveFile)
+  // can never serve stale bytes for a URL that looks the same but isn't.
+  const images = splitList(row.images).map((url, i) => `/api/products/${row.id}/image/${i}?v=${extractDriveFileId(url)}`);
   return {
     id: row.id,
     brand: row.brand,
@@ -145,8 +150,8 @@ router.post("/admin/products", requireAdmin, upload.array("images", 8), async (r
     return res.status(400).json({ error: "Brand and model are required." });
   }
   try {
-    const rows = await readAll(TABLES.PRODUCTS);
-    const id = nextId(rows, "id", "CAM", 4);
+    const existingRows = await readAll(TABLES.PRODUCTS);
+    const id = await nextCounter("product", "CAM", 4, existingRows, "id");
     const files = req.files || [];
     const images = [];
     for (let i = 0; i < files.length; i++) {

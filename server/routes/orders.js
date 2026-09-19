@@ -1,5 +1,5 @@
 import express from "express";
-import { TABLES, readAll, appendRow, updateRow, nextId } from "../sheets.js";
+import { TABLES, readAll, appendRow, updateRow, nextCounter } from "../sheets.js";
 import { requireAdmin } from "../auth.js";
 import { requestPayment, verifyPayment } from "../payment/zarinpal.js";
 
@@ -39,7 +39,7 @@ router.post("/checkout", async (req, res) => {
     }
 
     const existingOrders = await readAll(TABLES.ORDERS);
-    const code = nextId(existingOrders, "code", "ORD", 5);
+    const code = await nextCounter("order", "ORD", 5, existingOrders, "code");
     const order = {
       code,
       status: "pending",
