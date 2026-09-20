@@ -50,6 +50,17 @@ async function main() {
   app.use(express.json());
   app.use(cookieParser());
 
+  // API responses reflect live, frequently-changing data (products, stock,
+  // orders) — without this, browsers can and do cache a GET across reloads
+  // (observed: a newly-added product missing from /api/products after a
+  // plain reload, until a cache-busted fetch proved the data was already
+  // correct server-side). The one deliberate exception is the image proxy
+  // route, which sets its own long-lived Cache-Control after this runs.
+  app.use("/api", (req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+
   app.get("/api/health", (req, res) => {
     res.json({ server: "ok", ...dbStatus });
   });

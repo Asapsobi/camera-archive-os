@@ -6,7 +6,12 @@
 
 import { Readable } from "node:stream";
 import { google } from "googleapis";
+import { Jimp } from "jimp";
 import { getAuthClient } from "./googleAuth.js";
+
+const RESIZABLE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_IMAGE_DIMENSION = 1600;
+const JPEG_QUALITY = 78;
 
 export const TABLES = {
   PRODUCTS: {
@@ -243,12 +248,35 @@ export async function nextCounter(counterKey, prefix, padLength, existingRows = 
 // proxies image bytes through our own authenticated Drive access instead
 // via streamDriveFile() below. More reliable, and arguably more sensible
 // than making every photo public on Drive anyway.
+// Photos come straight from admin uploads (real phone cameras — seen up to
+// 6.7MB at 4000x3000) with nothing else in the pipeline resizing them, so
+// this is the one place that has to. Without it, a "second photo" would
+// technically work but take so long to fetch it looked broken — which is
+// exactly what got reported. HEIC isn't in RESIZABLE_MIME_TYPES since Jimp
+// can't decode it; those upload as-is rather than failing the request.
+async function prepareImage(buffer, mimeType) {
+  if (!RESIZABLE_MIME_TYPES.has(mimeType)) return { buffer, mimeType };
+  try {
+    const img = await Jimp.read(buffer);
+    if (img.width > MAX_IMAGE_DIMENSION || img.height > MAX_IMAGE_DIMENSION) {
+      if (img.width > img.height) img.resize({ w: MAX_IMAGE_DIMENSION });
+      else img.resize({ h: MAX_IMAGE_DIMENSION });
+    }
+    const resized = await img.getBuffer("image/jpeg", { quality: JPEG_QUALITY });
+    return { buffer: resized, mimeType: "image/jpeg" };
+  } catch (err) {
+    console.warn(`[sheets] could not resize a ${mimeType} image, uploading as-is:`, err.message);
+    return { buffer, mimeType };
+  }
+}
+
 export async function uploadImage(buffer, mimeType, filename) {
+  const prepared = await prepareImage(buffer, mimeType);
   const drive = driveApi();
   const folderId = requireEnv("GOOGLE_DRIVE_FOLDER_ID");
   const res = await drive.files.create({
     requestBody: { name: filename, parents: [folderId] },
-    media: { mimeType, body: Readable.from(buffer) },
+    media: { mimeType: prepared.mimeType, body: Readable.from(prepared.buffer) },
     fields: "id",
   });
   return `https://drive.google.com/uc?export=view&id=${res.data.id}`;
@@ -273,13 +301,39 @@ export async function deleteImageByUrl(url) {
   }
 }
 
+// Files never change once uploaded (a re-upload always gets a fresh id, see
+// nextCounter()), so caching by fileId forever is safe. This matters a lot
+// here: each Drive API round-trip from this server runs ~1.5-2s on its
+// own — fine once, but every uncached view was paying that twice (once
+// for a metadata lookup, once for content). Reading content-type off the
+// media response itself removes that first round-trip entirely; caching
+// removes it for every request after the first.
+const imageCache = new Map();
+const IMAGE_CACHE_MAX_ENTRIES = 200;
+
 export async function streamDriveFile(fileId, res) {
+  const cached = imageCache.get(fileId);
+  if (cached) {
+    res.setHeader("Content-Type", cached.mimeType);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    return res.end(cached.buffer);
+  }
+
   const drive = driveApi();
-  const meta = await drive.files.get({ fileId, fields: "mimeType" });
   const stream = await drive.files.get({ fileId, alt: "media" }, { responseType: "stream" });
-  res.setHeader("Content-Type", meta.data.mimeType || "image/jpeg");
+  const mimeType = stream.headers.get("content-type") || "image/jpeg";
+  const chunks = [];
+  for await (const chunk of stream.data) chunks.push(chunk);
+  const buffer = Buffer.concat(chunks);
+
+  if (imageCache.size >= IMAGE_CACHE_MAX_ENTRIES) {
+    imageCache.delete(imageCache.keys().next().value);
+  }
+  imageCache.set(fileId, { buffer, mimeType });
+
+  res.setHeader("Content-Type", mimeType);
   res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-  stream.data.pipe(res);
+  res.end(buffer);
 }
 
 // Cheap reachability check for /api/health — reads the Products header row.

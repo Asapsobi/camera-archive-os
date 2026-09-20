@@ -199,6 +199,13 @@
   flex: 1 1 260px;
   min-width: 220px;
   max-width: 340px;
+  /* Explicit column so this box's own height always includes both children
+     (photo + the thumbnail strip) — relying on default block auto-height
+     here left the aspect-ratio'd <img> and the thumbs strip disagreeing
+     about who was responsible for the extra height, so the thumbs (and
+     everything after them) rendered on top of the info section below. */
+  display: flex;
+  flex-direction: column;
 }
 
 .product-detail__photo svg,
@@ -486,6 +493,11 @@
 
   .product-detail__photo {
     max-width: none;
+    /* flex:1 1 260px (desktop) sets a WIDTH basis — but flex-direction is
+       column here, so that basis would apply to height instead and the
+       real photo (aspect-ratio 5/4 at full width) needs more than 260px
+       tall, overflowing into the info section below it. Size to content. */
+    flex: 0 0 auto;
   }
   .checkout-form__row {
     grid-template-columns: 1fr;

@@ -36,14 +36,14 @@ export default function MyComputerApp() {
             <div
               role="button"
               tabIndex={0}
-              onDoubleClick={() => launch("archive", { initialBrand: selected })}
+              onClick={() => launch("archive", { initialBrand: selected })}
               onKeyDown={(e) => e.key === "Enter" && launch("archive", { initialBrand: selected })}
               style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer" }}
             >
               <Icon name="folder" size={48} />
               <span style={{ fontSize: 11.5 }}>{selected}</span>
             </div>
-            <p style={{ fontSize: 11.5, color: "var(--metal-700)", marginTop: 10 }}>double-click to open in Camera Archive</p>
+            <p style={{ fontSize: 11.5, color: "var(--metal-700)", marginTop: 10 }}>tap to open in Camera Archive</p>
           </>
         )}
       </div>
